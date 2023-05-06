@@ -3,7 +3,7 @@
 ## 概要
 
 このリポジトリは研究開発目的の簡易LiDAR計測アプリのコードです。
-実装にあたり、下記のコードをベースとして拡張しました。
+実装にあたり、下記のコードをベースとさせていただき、拡張しました。
 
  [OPTiM TECH BLOG](https://tech-blog.optim.co.jp) 
  記事「[ARKit と LiDAR で 3 次元空間認識して SceneKit でリアルタイム描画](https://tech-blog.optim.co.jp/entry/2021/05/06/100000)」
