@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  LiDARViewer3D
 //
-//  Created by T Mori on 5/3/2023.
+//  Created by T Mori on 5/4/2023.
 //
 
 import ARKit
@@ -11,6 +11,14 @@ import SceneKit
 import AVFoundation
 import UIKit
 import ZIPFoundation
+import Combine
+import AudioToolbox
+
+class ContentViewModel: ObservableObject {
+    @Published var capturedPlyFileURLs: [URL] = []
+    @Published var capturedImageURLs: [URL] = []
+}
+
 
 struct ContentView {
     @State var session: ARSession
@@ -23,6 +31,9 @@ struct ContentView {
     @State private var pointCloudData: [(position: SIMD3<Float>, color: UIColor)] = []
     @State private var isTakingPointCloud = false
     @State private var isScreenBlack = false
+    @State private var currentTimestamp: String?
+    
+    @ObservedObject var viewModel = ContentViewModel()
     
     init() {
         let session = ARSession()
@@ -30,10 +41,8 @@ struct ContentView {
         configuration.sceneReconstruction = .mesh
         session.run(configuration)
         self.session = session
-
         self.scene = SCNScene()
     }
-    
 }
 
 extension ContentView: View {
@@ -41,24 +50,6 @@ extension ContentView: View {
         UIControl().sendAction(#selector(URLSessionTask.suspend), to: UIApplication.shared, for: nil)
     }
 
-    
-    func playClickSound() {
-        guard let url = Bundle.main.url(forResource: "click2", withExtension: "mp3") else {
-            print("URL not found")
-            return
-        }
-
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
-            player = try AVAudioPlayer(contentsOf: url, fileTypeHint: AVFileType.mp3.rawValue)
-            guard let player = player else { return }
-            player.play()
-        } catch let error {
-            print("Error playing sound: \(error.localizedDescription)")
-        }
-    }
-    
     func createPlyString(from points: [(position: SIMD3<Float>, color: UIColor)]) -> String {
         let header = "ply\n" +
             "format ascii 1.0\n" +
@@ -84,29 +75,29 @@ extension ContentView: View {
         return header + body
     }
 
-        
-
     func savePlyFile() {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+        
+
 
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
             if !self.isTakingPointCloud {
                 timer.invalidate()
                 guard !self.pointCloudData.isEmpty else { return }
                 let plyString = self.createPlyString(from: self.pointCloudData)
-
-                let dateString = dateFormatter.string(from: Date())
+                let dateString = currentTimestamp ?? dateFormatter.string(from: Date())
                 let fileName = "PointCloud_\(dateString).ply"
                 let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(fileName)
-
+                
                 do {
-                    try plyString.write(to: fileURL, atomically: true, encoding: .utf8)
-                    print("PLY file saved at: \(fileURL.path)")
-                } catch {
-                    print("Error saving PLY file: \(error)")
-                }
-                self.pointCloudData.removeAll()
+                      try plyString.write(to: fileURL, atomically: true, encoding: .utf8)
+                      print("PLY file saved at: \(fileURL.path)")
+                      self.viewModel.capturedPlyFileURLs.append(fileURL)
+                  } catch {
+                      print("Error saving PLY file: \(error)")
+                  }
+                  self.pointCloudData.removeAll()
             } else {
                 guard let pointCloud = self.session.currentFrame?.rawFeaturePoints else { return }
                 let pointsWithColor = pointCloud.points.map { (position: $0, color: UIColor(self.pointColor)) }
@@ -115,41 +106,71 @@ extension ContentView: View {
         }
     }
     
-    
-    func sharePlyFiles() {
+    func saveImage(_ image: UIImage) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+        let dateString = currentTimestamp ?? dateFormatter.string(from: Date())
+        let fileName = "Image_\(dateString).jpg"
+        let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(fileName)
+        
+        if let data = image.jpegData(compressionQuality: 0.9) {
+            do {
+                try data.write(to: fileURL)
+                print("Image saved at: \(fileURL.path)")
+                self.viewModel.capturedImageURLs.append(fileURL)
+            } catch {
+                print("Error saving image: \(error)")
+            }
+        }
+        
+    }
+
+    func captureImage() {
+        if let currentFrame = self.session.currentFrame {
+            let image = CIImage(cvPixelBuffer: currentFrame.capturedImage)
+            let context = CIContext()
+            if let cgImage = context.createCGImage(image, from: image.extent) {
+                let uiImage = UIImage(cgImage: cgImage)
+                saveImage(uiImage)
+            }
+        }
+    }
+
+    func shareFiles() {
+        guard !viewModel.capturedPlyFileURLs.isEmpty, !viewModel.capturedImageURLs.isEmpty else {
+            print("No PLY or JPG files found")
+            return
+        }
+
+        let fileManager = FileManager.default
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
         let dateString = dateFormatter.string(from: Date())
         let zipFileName = "PointCloud_\(dateString).zip"
-        let documentsDirectoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let documentsDirectoryURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let zipFileURL = documentsDirectoryURL.appendingPathComponent(zipFileName)
 
         do {
-            let filePaths = try FileManager.default.contentsOfDirectory(at: documentsDirectoryURL, includingPropertiesForKeys: nil, options: [])
-            let plyFilePaths = filePaths.filter { $0.pathExtension == "ply" }
-
-            if !plyFilePaths.isEmpty {
-                let archive = Archive(url: zipFileURL, accessMode: .create)
-                try plyFilePaths.forEach { entryURL in
-                    try archive?.addEntry(with: entryURL.lastPathComponent, relativeTo: documentsDirectoryURL)
-                }
-                
-                DispatchQueue.main.async {
-                    let activityViewController = UIActivityViewController(activityItems: [zipFileURL], applicationActivities: nil)
-                    if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                        scene.windows.first?.rootViewController?.present(activityViewController, animated: true, completion: nil)
-                    }
-                }
-                
-            } else {
-                print("No PLY files found")
+            let archive = Archive(url: zipFileURL, accessMode: .create)
+            for plyFileURL in viewModel.capturedPlyFileURLs {
+                try archive?.addEntry(with: plyFileURL.lastPathComponent, relativeTo: documentsDirectoryURL)
             }
+            for imageFileURL in viewModel.capturedImageURLs {
+                try archive?.addEntry(with: imageFileURL.lastPathComponent, relativeTo: documentsDirectoryURL)
+            }
+
+            DispatchQueue.main.async {
+                let activityViewController = UIActivityViewController(activityItems: [zipFileURL], applicationActivities: nil)
+                if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                    scene.windows.first?.rootViewController?.present(activityViewController, animated: true, completion: nil)
+                }
+            }
+
         } catch {
-            print("Error sharing PLY files: \(error)")
+            print("Error sharing files: \(error)")
         }
     }
-    
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             ARSceneView(
@@ -169,7 +190,8 @@ extension ContentView: View {
                 HStack {
                     Button(action: {
                         self.showPointCloud.toggle()
-                        playClickSound()
+                        let recordStartSoundID: SystemSoundID = 1103
+                        AudioServicesPlaySystemSound(recordStartSoundID)
                     }, label: {
                         Text("Point")
                             .foregroundColor(.white)
@@ -181,7 +203,8 @@ extension ContentView: View {
                     
                     Button(action: {
                         self.showMesh.toggle()
-                        playClickSound()
+                        let recordStartSoundID: SystemSoundID = 1103
+                        AudioServicesPlaySystemSound(recordStartSoundID)
                     }, label: {
                         Text("Mesh")
                             .foregroundColor(.white)
@@ -197,7 +220,8 @@ extension ContentView: View {
                     Button(action: {
                         self.isTakingPointCloud = true
                         savePlyFile()
-                        playClickSound()
+                        let recordStartSoundID: SystemSoundID = 1117
+                        AudioServicesPlaySystemSound(recordStartSoundID)
                     }, label: {
                         Text("Take")
                             .foregroundColor(.white)
@@ -214,6 +238,9 @@ extension ContentView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             self.isScreenBlack = false
                         }
+                        let recordStartSoundID: SystemSoundID = 1118
+                        AudioServicesPlaySystemSound(recordStartSoundID)
+                        captureImage()
                     }, label: {
                         Text("Stop")
                             .foregroundColor(.white)
@@ -225,12 +252,11 @@ extension ContentView: View {
                     .disabled(!isTakingPointCloud)
                 }
 
-                    
-                    
                 HStack {
                     Button(action: {
-                            sharePlyFiles()
-                            playClickSound()
+                        shareFiles()
+                        let recordStartSoundID: SystemSoundID = 1103
+                        AudioServicesPlaySystemSound(recordStartSoundID)
                     }, label: {
                         Text("Share")
                             .foregroundColor(.white)
@@ -239,10 +265,11 @@ extension ContentView: View {
                     .padding()
                     .background(Color.orange.opacity(0.7))
                     .cornerRadius(10)
-    
+
                     Button(action: {
                         exitApp()
-                        playClickSound()
+                        let recordStartSoundID: SystemSoundID = 1103
+                        AudioServicesPlaySystemSound(recordStartSoundID)
                     }, label: {
                         Text("Exit")
                             .foregroundColor(.white)
@@ -255,7 +282,6 @@ extension ContentView: View {
             }
             .padding(.bottom, 20)
         }
-        
     }
 }
 
@@ -264,5 +290,4 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
-
-
+        
