@@ -2,7 +2,7 @@
 
 ## 概要
 
-このリポジトリは研究開発目的の簡易LiDAR計測アプリのコードです。
+このリポジトリは研究開発目的の簡易LiDAR計測アプリのコードです。LiDAR センサを搭載した iPhone/iPad で動作します。 
 実装にあたり、下記のコードをベースとさせていただき、拡張しました。
 
  [OPTiM TECH BLOG](https://tech-blog.optim.co.jp) 
