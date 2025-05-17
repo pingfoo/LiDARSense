@@ -218,6 +218,9 @@ extension ContentView: View {
                 
                 HStack {
                     Button(action: {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+                        self.currentTimestamp = dateFormatter.string(from: Date())
                         self.isTakingPointCloud = true
                         savePlyFile()
                         let recordStartSoundID: SystemSoundID = 1117
@@ -241,6 +244,7 @@ extension ContentView: View {
                         let recordStartSoundID: SystemSoundID = 1118
                         AudioServicesPlaySystemSound(recordStartSoundID)
                         captureImage()
+                        self.currentTimestamp = nil
                     }, label: {
                         Text("Stop")
                             .foregroundColor(.white)
