@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  LiDARViewer3D
+//  LiDARSense
 //
 //  Created by T Mori on 5/4/2023.
 //
