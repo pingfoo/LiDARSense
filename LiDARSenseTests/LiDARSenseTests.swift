@@ -26,6 +26,19 @@ final class LiDARSenseTests: XCTestCase {
         // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
     }
 
+    func testCreatePlyString() throws {
+        let points: [(position: SIMD3<Float>, color: UIColor)] = [
+            (position: SIMD3<Float>(0, 0, 0), color: .red),
+            (position: SIMD3<Float>(1, 1, 1), color: .green)
+        ]
+
+        let plyString = ContentView().createPlyString(from: points)
+
+        XCTAssertTrue(plyString.contains("element vertex \(points.count)"))
+        XCTAssertTrue(plyString.contains("0.0 0.0 0.0 255 0 0"))
+        XCTAssertTrue(plyString.contains("1.0 1.0 1.0 0 255 0"))
+    }
+
     func testPerformanceExample() throws {
         // This is an example of a performance test case.
         self.measure {
