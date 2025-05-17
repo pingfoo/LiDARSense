@@ -1,6 +1,6 @@
 //
 //  ARSceneView.swift
-//  LiDARViewer3D
+//  LiDARSense
 //
 //  Created by TM on 2023/05/04.
 //
