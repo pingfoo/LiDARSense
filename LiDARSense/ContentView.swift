@@ -33,7 +33,7 @@ struct ContentView {
     @State private var isScreenBlack = false
     @State private var currentTimestamp: String?
     
-    @ObservedObject var viewModel = ContentViewModel()
+    @StateObject var viewModel = ContentViewModel()
     
     init() {
         let session = ARSession()
@@ -50,7 +50,7 @@ extension ContentView: View {
         UIControl().sendAction(#selector(URLSessionTask.suspend), to: UIApplication.shared, for: nil)
     }
 
-    func createPlyString(from points: [(position: SIMD3<Float>, color: UIColor)]) -> String {
+    static func createPlyString(from points: [(position: SIMD3<Float>, color: UIColor)]) -> String {
         let header = "ply\n" +
             "format ascii 1.0\n" +
             "element vertex \(points.count)\n" +
@@ -65,9 +65,11 @@ extension ContentView: View {
         var body = ""
 
         for point in points {
-            let red = UInt8((point.color.cgColor.components?[0] ?? 0.0) * 255)
-            let green = UInt8((point.color.cgColor.components?[1] ?? 0.0) * 255)
-            let blue = UInt8((point.color.cgColor.components?[2] ?? 0.0) * 255)
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            point.color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            let red = UInt8(r * 255)
+            let green = UInt8(g * 255)
+            let blue = UInt8(b * 255)
 
             body += "\(point.position.x) \(point.position.y) \(point.position.z) \(red) \(green) \(blue)\n"
         }
@@ -85,7 +87,7 @@ extension ContentView: View {
             if !self.isTakingPointCloud {
                 timer.invalidate()
                 guard !self.pointCloudData.isEmpty else { return }
-                let plyString = self.createPlyString(from: self.pointCloudData)
+                let plyString = ContentView.createPlyString(from: self.pointCloudData)
                 let dateString = currentTimestamp ?? dateFormatter.string(from: Date())
                 let fileName = "PointCloud_\(dateString).ply"
                 let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(fileName)
@@ -162,7 +164,7 @@ extension ContentView: View {
             DispatchQueue.main.async {
                 let activityViewController = UIActivityViewController(activityItems: [zipFileURL], applicationActivities: nil)
                 if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
-                    scene.windows.first?.rootViewController?.present(activityViewController, animated: true, completion: nil)
+                    scene.keyWindow?.rootViewController?.present(activityViewController, animated: true, completion: nil)
                 }
             }
 
@@ -184,7 +186,7 @@ extension ContentView: View {
 
             Color.black
                 .opacity(isScreenBlack ? 1 : 0)
-                .animation(.easeInOut(duration: 0.1))
+                .animation(.easeInOut(duration: 0.1), value: isScreenBlack)
             
             VStack {
                 HStack {

@@ -58,12 +58,12 @@ extension ARSceneView {
 
 func createPointCloudNode(from pointCloud: ARPointCloud, color: Color, pointSize: CGFloat = 0.005) -> SCNNode {
     let node = SCNNode()
+    let uiColor = UIColor(color)
 
-    for index in 0..<pointCloud.__count {
-        let point = pointCloud.points[index]
+    for point in pointCloud.points {
         let vector = SCNVector3Make(point.x, point.y, point.z)
         let sphere = SCNSphere(radius: pointSize)
-        sphere.firstMaterial?.diffuse.contents = color.cgColor
+        sphere.firstMaterial?.diffuse.contents = uiColor
         sphere.firstMaterial?.lightingModel = .constant
         let pointNode = SCNNode(geometry: sphere)
         pointNode.position = vector
@@ -98,7 +98,7 @@ extension ARSceneView.Coordinator: ARSessionDelegate {
 
                 let defaultMaterial = SCNMaterial()
                 defaultMaterial.fillMode = .lines
-                defaultMaterial.diffuse.contents = self.lineColor.cgColor
+                defaultMaterial.diffuse.contents = UIColor(self.lineColor)
                 scnGeometry.materials = [defaultMaterial]
 
                 let meshNode = SCNNode(geometry: scnGeometry)
