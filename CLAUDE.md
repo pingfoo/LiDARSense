@@ -52,5 +52,10 @@ Note: UI tests and some unit tests require a physical device with LiDAR.
 ## Code Conventions
 
 - SwiftUI declarative patterns
+- Use `@StateObject` (not `@ObservedObject`) for inline-initialized view models
+- Use `.animation(_:value:)` (not the deprecated parameterless form)
+- Use `UIColor(_:)` for converting SwiftUI `Color` to UIKit (not `.cgColor`)
+- Use `UIColor.getRed(_:green:blue:alpha:)` for color component extraction (color-space safe)
+- Pure logic functions should be `static` for testability without ARKit hardware
 - No linter or formatter configured; follow existing code style
 - Japanese comments appear in some files (original authors at OPTiM Corp.)
